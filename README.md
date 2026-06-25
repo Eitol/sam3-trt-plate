@@ -81,7 +81,7 @@ perfecto; solo se rompe cuando ORT optimiza el grafo grande. `CUDA opt=DISABLE_A
 ## Quickstart
 
 ```bash
-git clone https://github.com/<tu-usuario>/sam3-trt-plate.git
+git clone https://github.com/Eitol/sam3-trt-plate.git
 cd sam3-trt-plate
 HF_TOKEN=hf_xxxxx ./setup.sh
 # (opcional) elegir intérprete / opt-level / carpeta de salida:
