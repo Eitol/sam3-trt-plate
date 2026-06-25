@@ -1,0 +1,13 @@
+# SAM3 + TensorRT FP16 — dependencias de Python.
+#
+# NOTA: torch (build CUDA) y tensorrt se instalan APARTE porque dependen de la GPU/CUDA de la
+# máquina. En las cajas vast.ai suelen venir preinstalados (p.ej. /venv/main con torch cu128 +
+# tensorrt 10). setup.sh verifica que estén; si no, instalalos vos:
+#   pip install torch --index-url https://download.pytorch.org/whl/cu128
+#   pip install "tensorrt<11"        # onnxruntime/TRT-EP no se usa; solo el runtime de TRT 10
+#
+# Estas son las dependencias livianas que setup.sh sí instala:
+transformers>=5.12
+pillow
+numpy<3
+pycocotools

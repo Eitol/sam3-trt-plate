@@ -1,0 +1,14 @@
+# artefactos generados (grandes / específicos de la máquina) — NO commitear
+*.onnx
+*.onnx.data
+*.engine
+*.timing
+__pycache__/
+*.pyc
+# sidecars de salida
+*.seg.json
+*.seg.json.tmp
+# datos
+*.jpg
+*.jpeg
+*.png
