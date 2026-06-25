@@ -18,17 +18,36 @@ coordenadas de la imagen completa.
 El prompt `"license plate"` está **horneado** en el grafo (no se re-tokeniza por imagen) y el input
 es de shape fijo `1×3×1008×1008` → grafo 100% estático, ideal para TensorRT.
 
-## Resultados (validado sobre 60 crops de patentes reales)
+## Benchmark — TensorRT vs PyTorch ("lo normal")
 
-| Métrica | Valor |
-|---|---|
-| **Calidad TRT-FP16 vs el MISMO modelo en PyTorch fp32** | maskIoU **0.999** mean / 0.9995 median / **0.993 min** — 100% de los crops ≥ 0.99 |
-| Calidad vs SAM3 PyTorch nativo (bf16, otra implementación) | maskIoU 0.953 mean / 0.964 median, detección 60/60 |
-| **Cómputo puro TRT** | ~**75 ms** (vs 167 ms PyTorch nativo bf16) = **~2.2×** |
-| Runner end-to-end (load + crop + TRT + post) | ~95 ms/img = **~1.75×** |
+Medido sobre **60 crops de patentes reales** de 1008×1008, 1 prompt `"license plate"`, en una
+**RTX 3090** (TensorRT 10.16, torch 2.10 cu128). Warm (sin contar el primer batch).
 
-**No hay pérdida de calidad por usar TensorRT/FP16:** la máscara TRT-FP16 es 99.9% idéntica a la del
-mismo modelo en fp32 (la diferencia es redondeo sub-píxel de bordes).
+### Velocidad
+
+| Método | ms/img | img/s | speedup |
+|---|---:|---:|---:|
+| PyTorch nativo (bf16) — *lo normal, producción* | 167 | 6.0 | **1.0×** (baseline) |
+| PyTorch HF (fp32, sin acelerar) | 472 | 2.1 | 0.35× |
+| **TensorRT FP16 — cómputo puro de SAM3** | **75** | **13.2** | **2.2×** |
+| **TensorRT FP16 — runner end-to-end** (load+crop+post) | **95** | **10.5** | **1.75×** |
+
+> "Cómputo puro" = solo la inferencia del modelo (lo que TensorRT acelera). El runner end-to-end
+> incluye además leer la imagen, recortar el crop 1008 y el post-process. Sobre las **~140k imágenes
+> HD+** del proyecto, eso baja la corrida de re-segmentación de ~1 h a ~30 min.
+
+### Calidad — **NO baja** ✅
+
+| Comparación | maskIoU mean | median | min | detección |
+|---|---:|---:|---:|---:|
+| **TRT-FP16 vs el MISMO modelo en PyTorch fp32** | **0.9991** | 0.9995 | **0.9927** | — |
+| TRT-FP16 vs PyTorch nativo bf16 (otra implementación) | 0.953 | 0.964 | 0.841 | 60/60 |
+| *(referencia)* PyTorch HF fp32 vs nativo bf16 | 0.953 | 0.964 | 0.841 | 60/60 |
+
+La máscara de TensorRT FP16 es **99.9% idéntica** a la del mismo modelo en fp32 PyTorch (100% de los
+crops ≥ 0.99 IoU; |Δscore| medio 0.0009). El gap es redondeo sub-píxel de bordes, **no** una pérdida
+de TensorRT: nótese que TRT-FP16 se desvía del PyTorch nativo **exactamente lo mismo** (0.953) que
+otro PyTorch (HF fp32) → la diferencia es entre *implementaciones*, no por usar TensorRT/FP16.
 
 ## ⚠️ Por qué se construye con la API nativa de TensorRT (y NO con onnxruntime)
 
