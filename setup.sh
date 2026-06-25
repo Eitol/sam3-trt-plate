@@ -10,13 +10,15 @@
 # Variables opcionales:
 #   PYBIN=/venv/main/bin/python   # intérprete (default: autodetecta /venv/main o python3)
 #   WORKDIR=/dev/shm/sam3trt       # dónde dejar onnx + engine (default: /dev/shm/sam3trt)
-#   OPTLVL=3                       # builder_optimization_level de TRT (0-5; 5 = más lento de construir)
+#   OPTLVL=5                       # builder_optimization_level de TRT (0-5). 5 = engine ~15% más
+#                                  #   rápido en runtime pero build ~22min (vs ~3min con 3). Default 5
+#                                  #   porque se construye 1 sola vez y se corre sobre muchas imágenes.
 set -euo pipefail
 
 : "${HF_TOKEN:?Definí HF_TOKEN (facebook/sam3 es un repo gated): HF_TOKEN=hf_xxx ./setup.sh}"
 export HUGGING_FACE_HUB_TOKEN="$HF_TOKEN"
 WORKDIR="${WORKDIR:-/dev/shm/sam3trt}"
-OPTLVL="${OPTLVL:-3}"
+OPTLVL="${OPTLVL:-5}"
 ONNX="$WORKDIR/sam3_plate.onnx"
 ENGINE="$WORKDIR/sam3_plate_fp16.engine"
 HERE="$(cd "$(dirname "$0")" && pwd)"

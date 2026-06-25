@@ -29,12 +29,14 @@ Medido sobre **60 crops de patentes reales** de 1008×1008, 1 prompt `"license p
 |---|---:|---:|---:|
 | PyTorch nativo (bf16) — *lo normal, producción* | 167 | 6.0 | **1.0×** (baseline) |
 | PyTorch HF (fp32, sin acelerar) | 472 | 2.1 | 0.35× |
-| **TensorRT FP16 — cómputo puro de SAM3** | **75** | **13.2** | **2.2×** |
-| **TensorRT FP16 — runner end-to-end** (load+crop+post) | **95** | **10.5** | **1.75×** |
+| TensorRT FP16 (opt-level 3) — runner end-to-end | 95 | 10.5 | 1.75× |
+| **TensorRT FP16 (opt-level 5, default) — end-to-end** | **81** | **12.3** | **2.06×** |
+| TensorRT FP16 — cómputo puro de SAM3 (opt-3) | 75 | 13.2 | 2.2× |
 
 > "Cómputo puro" = solo la inferencia del modelo (lo que TensorRT acelera). El runner end-to-end
-> incluye además leer la imagen, recortar el crop 1008 y el post-process. Sobre las **~140k imágenes
-> HD+** del proyecto, eso baja la corrida de re-segmentación de ~1 h a ~30 min.
+> incluye además leer la imagen, recortar el crop 1008 y el post-process. `OPTLVL=5` (default) da un
+> engine ~15% más rápido a costa de ~22 min de build (vs ~3 min con `OPTLVL=3`); como se construye una
+> sola vez y se corre sobre **~140k imágenes HD+**, conviene.
 
 ### Calidad — **NO baja** ✅
 
@@ -67,6 +69,23 @@ perfecto; solo se rompe cuando ORT optimiza el grafo grande. `CUDA opt=DISABLE_A
 `build_sam3_trt_engine.py` ya implementa el camino correcto.
 
 ---
+
+## Optimización: ¿batching? ¿GPU más grande? (medido)
+
+A **batch=1 la GPU ya está al 99% de uso y 348 W** (tope ~350 W del 3090), usando solo 2.2 GB de
+VRAM → el modelo es **compute-bound** (ViT-L a 1008² = 5184 tokens × 32 capas es mucho cómputo).
+Consecuencias prácticas:
+
+- **Batching (p.ej. 16) NO sube el throughput**: la GPU ya está saturada, así que batch=16 daría
+  ~el mismo img/s con 16× la latencia (y ~16× la VRAM → ni entra en 24 GB). Solo rinde si la GPU
+  está sub-utilizada, que no es el caso.
+- **Lo que sí rompe el muro de cómputo** (en la misma GPU): **INT8** (TensorRT con calibración —
+  ~1.3-1.8× si la precisión aguanta; requiere validar IoU) y **opt-level 5** (ya incluido, ~15%).
+- **GPU más rápida = ganancia ~lineal con los FLOPS**: 4090 ≈ 1.5×, L40S / RTX 6000 Ada ≈ 2×,
+  H100 ≈ 3×. Cero código: solo reconstruir el engine en esa máquina.
+- **Pipelining** (solapar load/crop/RLE de CPU con la GPU, patrón productor-consumidor) acerca el
+  end-to-end (81 ms) al cómputo puro (~61-75 ms) → ~1.2× en el runner, sin tocar el modelo.
+- La resolución **no** se puede bajar (SAM3 fija 1008 por RoPE), así que esa vía está cerrada.
 
 ## Requisitos
 
